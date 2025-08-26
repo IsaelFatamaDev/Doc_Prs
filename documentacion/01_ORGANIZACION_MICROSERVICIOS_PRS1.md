@@ -17,6 +17,7 @@
 | **MS-VG-0009** | discipline-management-service | Gestión Disciplinaria (Casos, Sanciones, UGEL) | 8009 | **PostgreSQL** | Dev 9 |
 | **MS-VG-0010** | inventory-resources-service | Inventario y Recursos (Stock, Kali Warma, Distribución) | 8010 | **PostgreSQL** | Dev 10 |
 | **MS-VG-0011** | notifications-communication-service | Notificaciones (Email, SMS, Push, Templates) | 8011 | **MongoDB** | Dev 11 |
+| **MS-VG-0012** | civic-dates-service | Fechas Cívicas (Fechas Patrias, Efemérides, Actividades Cívicas, Web Display) | 8012 | **MongoDB** | Dev 1 |
 
 ---
 
@@ -42,7 +43,6 @@
 ├── 🎓 Niveles Educativos (inicial, primaria, secundaria por sede)
 ├── 📚 Grados y Secciones (estructura académica por nivel)
 ├── 📅 Calendarios Académicos (años lectivos, períodos, feriados)
-├── 🇵🇪 Fechas Cívicas (fechas patrias, efemérides, celebraciones nacionales)
 ├── ⚙️ Configuraciones del Sistema (parámetros, reglas de negocio)
 ├── 📊 Reportes Institucionales (estadísticas, indicadores UGEL)
 └── 🏆 Logros y Reconocimientos (histórico institucional)
@@ -72,16 +72,8 @@ GET    /api/v1/institution/grades/level/{levelId} # Grados por nivel
 POST   /api/v1/institution/academic-calendar  # Crear calendario
 GET    /api/v1/institution/academic-calendar/current # Calendario actual
 GET    /api/v1/institution/academic-calendar/holidays # Feriados del año
+```
 
-# Fechas Cívicas
-GET    /api/v1/institution/civic-dates        # Listar fechas cívicas del año
-GET    /api/v1/institution/civic-dates/month/{month} # Fechas cívicas por mes
-GET    /api/v1/institution/civic-dates/current # Fechas cívicas del mes actual
-GET    /api/v1/institution/civic-dates/upcoming # Próximas fechas cívicas (15 días)
-POST   /api/v1/institution/civic-dates        # Crear/personalizar fecha cívica
-PUT    /api/v1/institution/civic-dates/{civicDateId} # Actualizar fecha cívica
-DELETE /api/v1/institution/civic-dates/{civicDateId} # Eliminar fecha cívica personalizada
-GET    /api/v1/institution/civic-dates/calendar-view # Vista calendario con fechas cívicas
 ```
 
 #### **Eventos Emitidos:**
@@ -92,9 +84,6 @@ CampusCreated            # Nueva sede creada
 AcademicYearStarted      # Año académico iniciado
 CalendarUpdated          # Calendario modificado
 GradeStructureChanged    # Estructura de grados modificada
-CivicDateAdded           # Nueva fecha cívica agregada
-CivicDateUpdated         # Fecha cívica actualizada
-CivicDateReminder        # Recordatorio de fecha cívica próxima
 ```
 
 ---
@@ -468,7 +457,35 @@ MS-VG-0010: Inventory Resources    → Control de stock
 
 ---
 
-## 📊 **CLASIFICACIÓN DE TABLAS POR MICROSERVICIO**
+## 📊 **CLASIFICACIÓN REALISTA DE TABLAS POR MICROSERVICIO**
+
+> **⚠️ IMPORTANTE**: NO todos los microservicios tienen todos los tipos de tablas. La clasificación depende de la naturaleza y responsabilidades específicas de cada servicio.
+
+### **📝 TIPOS DE TABLAS EXPLICADOS:**
+
+#### **📋 Tablas Maestras:**
+
+- **Definición**: Catálogos, configuraciones y datos de referencia
+- **Características**: Datos relativamente estáticos, utilizados por múltiples procesos
+- **Ejemplos**: tipos_usuario, roles, configuraciones, catálogos
+
+#### **💾 Tablas Transaccionales Básicas (Cabecera-Detalle):**
+
+- **Definición**: Operaciones principales del negocio con estructura cabecera-detalle
+- **Características**: Datos dinámicos, operaciones CRUD frecuentes
+- **Estructura**:
+  - **Cabecera**: Información principal del registro
+  - **Detalle**: Información específica relacionada a la cabecera
+
+#### **🔄 Tablas Distribuidas:**
+
+- **Definición**: Datos para sincronización e integración entre microservicios
+- **Características**: Eventos, referencias cruzadas, datos de sincronización
+- **Ejemplos**: eventos_sync, referencias_cruzadas, logs_integracion
+
+---
+
+### **🎯 CLASIFICACIÓN POR MICROSERVICIO (SEGÚN REALIDAD):**
 
 ### **🏛️ MS-VG-0001: Institution Management Service**
 
@@ -527,6 +544,8 @@ MS-VG-0010: Inventory Resources    → Control de stock
 
 ### **🔐 MS-VG-0003: Auth & Security Service**
 
+> **📌 NOTA**: Este microservicio es principalmente de **configuración y autenticación**, NO requiere transaccionales complejas cabecera-detalle.
+
 #### **📋 Tablas Maestras:**
 
 - `roles` - Roles del sistema
@@ -534,7 +553,7 @@ MS-VG-0010: Inventory Resources    → Control de stock
 - `role_permissions` - Permisos asignados a roles
 - `security_policies` - Políticas de seguridad
 
-#### **💾 Tablas Transaccionales Básicas:**
+#### **💾 Tablas Transaccionales Simples (NO Cabecera-Detalle):**
 
 - `auth_users` - Credenciales de autenticación
 - `user_role_assignments` - Asignación de roles a usuarios
@@ -672,11 +691,36 @@ MS-VG-0010: Inventory Resources    → Control de stock
 
 ### **⚖️ MS-VG-0009: Discipline Management Service**
 
+> **📌 NOTA**: Este microservicio SI maneja **transaccionales CABECERA-DETALLE** para casos disciplinarios.
+
 #### **📋 Tablas Maestras:**
 
 - `disciplinary_categories` - Categorías de faltas disciplinarias
 - `sanction_types` - Tipos de sanciones
 - `appeal_procedures` - Procedimientos de apelación
+- `disciplinary_levels` - Niveles de gravedad disciplinaria
+
+#### **💾 Tablas Transaccionales (CABECERA-DETALLE):**
+
+**📄 CABECERAS DE TRANSACCIONES:**
+
+- `disciplinary_cases` - Casos disciplinarios (CABECERA)
+- `appeal_requests` - Solicitudes de apelación (CABECERA)
+- `sanction_applications` - Aplicación de sanciones (CABECERA)
+
+**📋 DETALLES DE TRANSACCIONES:**
+
+- `disciplinary_case_details` - Detalles del caso (infracciones específicas)
+- `case_evidence_items` - Evidencias del caso (documentos, testimonios)
+- `sanction_detail_items` - Detalles específicos de la sanción
+- `appeal_detail_arguments` - Argumentos detallados de la apelación
+- `case_participant_details` - Participantes involucrados (estudiantes, testigos)
+
+#### **🔄 Tablas Distribuidas:**
+
+- `discipline_audit_log` - Log de auditoría disciplinaria
+- `cross_service_discipline_events` - Eventos disciplinarios distribuidos
+- `discipline_notifications` - Notificaciones disciplinarias
 
 #### **💾 Tablas Transaccionales Básicas:**
 
@@ -741,6 +785,129 @@ MS-VG-0010: Inventory Resources    → Control de stock
 - `notification_sync_events` - Eventos de notificación
 - `delivery_analytics` - Analíticas de entrega
 - `cross_service_notification_refs` - Referencias de notificaciones
+
+---
+
+### **🇵🇪 MS-VG-0012: Civic Dates Service**
+
+**Base de Datos: MongoDB** 🍃
+
+#### **¿Por qué MongoDB?**
+
+- ✅ **Flexibilidad de esquemas**: Diferentes tipos de fechas cívicas con campos variables
+- ✅ **Documentos anidados**: Actividades, recursos y configuraciones por fecha
+- ✅ **Escalabilidad**: Preparado para múltiples instituciones y años de datos
+- ✅ **Búsquedas complejas**: Filtros por fecha, tipo, institución y categoría
+- ✅ **Contenido multimedia**: Imágenes, documentos y recursos embebidos
+
+#### **Responsabilidades:**
+
+```
+🇵🇪 GESTIÓN FECHAS CÍVICAS:
+├── 📅 Fechas Patrias Nacionales (28 de julio, 7 de junio, etc.)
+├── 📚 Efemérides Educativas (día del maestro, del idioma, etc.)
+├── 🌱 Fechas Ambientales (día de la tierra, del agua, etc.)
+├── 🏛️ Fechas Institucionales Personalizadas (aniversarios, santos patronos)
+├── 🎭 Actividades y Celebraciones asociadas a cada fecha
+├── 📖 Recursos Educativos (historia, materiales, guías)
+├── 🌐 Contenido para Página Web (información pública)
+├── 🔔 Notificaciones y Recordatorios automáticos
+├── 📊 Analytics de participación y engagement
+└── 📱 Integración con Dashboard y Web Institucional
+```
+
+#### **APIs Principales:**
+
+```bash
+# Gestión CRUD de Fechas Cívicas
+POST   /api/v1/civic-dates                      # Crear fecha cívica
+GET    /api/v1/civic-dates                      # Listar todas las fechas
+GET    /api/v1/civic-dates/{id}                 # Obtener fecha específica
+PUT    /api/v1/civic-dates/{id}                 # Actualizar fecha cívica
+DELETE /api/v1/civic-dates/{id}                 # Eliminar fecha personalizada
+
+# Consultas por Filtros
+GET    /api/v1/civic-dates/institution/{institutionId}    # Por institución
+GET    /api/v1/civic-dates/month/{yyyy-mm}                # Por mes específico
+GET    /api/v1/civic-dates/year/{yyyy}                    # Por año
+GET    /api/v1/civic-dates/type/{type}                    # Por tipo (NATIONAL, REGIONAL, INSTITUTIONAL)
+GET    /api/v1/civic-dates/category/{category}            # Por categoría (PATRIA, EFEMERIDE, etc.)
+
+# Calendario y Vista Web
+GET    /api/v1/civic-dates/calendar/{yyyy}/{mm}           # Vista calendario mensual
+GET    /api/v1/civic-dates/upcoming                       # Próximas fechas (30 días)
+GET    /api/v1/civic-dates/current                        # Fechas del mes actual
+GET    /api/v1/civic-dates/today                          # Fecha cívica de hoy
+
+# APIs Públicas para Web
+GET    /api/v1/public/civic-dates/institution/{id}        # Fechas públicas de institución
+GET    /api/v1/public/civic-dates/{id}/details            # Detalle público de fecha
+GET    /api/v1/public/civic-dates/calendar/{yyyy}/{mm}    # Calendario público
+GET    /api/v1/public/civic-dates/featured                # Fechas destacadas
+
+# Gestión de Actividades
+POST   /api/v1/civic-dates/{id}/activities               # Agregar actividad
+GET    /api/v1/civic-dates/{id}/activities               # Listar actividades
+PUT    /api/v1/civic-dates/activities/{activityId}       # Actualizar actividad
+DELETE /api/v1/civic-dates/activities/{activityId}       # Eliminar actividad
+
+# Notificaciones y Recordatorios
+POST   /api/v1/civic-dates/{id}/schedule-reminder        # Programar recordatorio
+GET    /api/v1/civic-dates/reminders/pending             # Recordatorios pendientes
+POST   /api/v1/civic-dates/{id}/notify                   # Enviar notificación inmediata
+
+# Analytics y Reportes
+GET    /api/v1/civic-dates/analytics/participation       # Analíticas de participación
+GET    /api/v1/civic-dates/analytics/popular             # Fechas más populares
+GET    /api/v1/civic-dates/reports/annual                # Reporte anual
+```
+
+#### **Eventos Emitidos:**
+
+```bash
+CivicDateCreated         # Nueva fecha cívica creada
+CivicDateUpdated         # Fecha cívica actualizada
+CivicDateDeleted         # Fecha cívica eliminada
+CivicDateReminder        # Recordatorio de fecha próxima
+ActivityAdded            # Nueva actividad agregada
+ActivityUpdated          # Actividad actualizada
+ParticipationRecorded    # Participación registrada
+WebContentViewed         # Contenido web visualizado
+NotificationSent         # Notificación enviada
+```
+
+#### **📋 Tablas Maestras:**
+
+- `civic_date_types` - Tipos de fechas cívicas (NATIONAL, REGIONAL, INSTITUTIONAL)
+- `civic_date_categories` - Categorías (PATRIA, EFEMERIDE, AMBIENTAL, EDUCATIVA, RELIGIOSA)
+- `activity_types` - Tipos de actividades (ceremonia, concurso, exposición, etc.)
+- `resource_types` - Tipos de recursos (documento, imagen, video, audio)
+- `notification_templates` - Plantillas de notificaciones específicas
+
+#### **💾 Tablas Transaccionales Básicas (Cabecera-Detalle):**
+
+**Cabeceras:**
+
+- `civic_dates` - Fechas cívicas principales
+- `civic_activities` - Actividades programadas
+- `notification_campaigns` - Campañas de notificación
+- `participation_sessions` - Sesiones de participación
+
+**Detalles:**
+
+- `civic_date_customizations` - Personalizaciones por institución
+- `activity_participants` - Participantes por actividad
+- `activity_resources` - Recursos asociados a actividades
+- `notification_recipients` - Destinatarios de notificaciones
+- `participation_records` - Registros de participación individual
+- `web_content_views` - Visualizaciones de contenido web
+
+#### **🔄 Tablas Distribuidas:**
+
+- `civic_date_sync_events` - Eventos de sincronización
+- `cross_service_civic_refs` - Referencias con otros servicios
+- `calendar_integration_events` - Integración con calendarios académicos
+- `web_analytics_events` - Eventos de analíticas web
 
 ---
 
@@ -1069,3 +1236,45 @@ POST   /api/v1/institution/civic-dates/schedule-reminders # Programar recordator
 **⏱️ Tiempo total estimado: 6.5 semanas**
 
 Esta nueva funcionalidad fortalecerá significativamente la propuesta de valor del sistema educativo, integrando aspectos cívicos y culturales importantes para la formación integral de los estudiantes. 🇵🇪
+
+---
+
+## **🎯 PRINCIPIOS APLICADOS EN LA ARQUITECTURA**
+
+### **✅ DECISIONES ARQUITECTÓNICAS CORRECTAS:**
+
+#### **1. 📋 SEPARACIÓN DE RESPONSABILIDADES:**
+
+- **✅ CORRECTO**: Fechas cívicas como **MS-VG-0012 independiente**
+- **❌ INCORRECTO**: Fechas cívicas dentro de MS-VG-0001 (institución)
+- **💡 RAZÓN**: Las fechas cívicas tienen lógica de negocio propia
+
+#### **2. 🔄 TRANSACCIONALES REALISTAS:**
+
+- **✅ SIMPLES**: Auth, User Management, Civic Dates
+- **✅ CABECERA-DETALLE**: Discipline Management, Academic Management
+- **💡 PRINCIPIO**: Solo usar cabecera-detalle cuando la lógica lo requiera
+
+#### **3. 📊 TABLAS SEGÚN NECESIDAD:**
+
+- **✅ CORRECTO**: Cada microservicio tiene solo las tablas que requiere
+- **❌ INCORRECTO**: Forzar mismo patrón de tablas en todos los servicios
+- **💡 REALIDAD**: No todos los microservicios necesitan todos los tipos
+
+### **📋 EJEMPLOS APLICADOS:**
+
+```
+🔐 AUTH & SECURITY     → Solo configuración → Transaccionales SIMPLES
+⚖️ DISCIPLINE MGMT     → Casos complejos → Transaccionales CABECERA-DETALLE
+🎉 CIVIC DATES         → Gestión simple → Transaccionales SIMPLES + MongoDB
+👥 USER MGMT           → Perfiles flexibles → MongoDB para esquemas variables
+📚 ACADEMIC MGMT       → Currículos complejos → PostgreSQL + CABECERA-DETALLE
+```
+
+### **💡 LECCIONES ARQUITECTÓNICAS:**
+
+1. **Fechas cívicas DEBEN ser servicio separado** (no dentro de institución)
+2. **Transaccionales cabecera-detalle** solo para casos que lo requieren
+3. **MongoDB para flexibilidad**, **PostgreSQL para transacciones complejas**
+4. **Cada microservicio tiene solo las tablas que necesita**
+5. **Separar responsabilidades** según lógica de negocio, no por conveniencia técnica
